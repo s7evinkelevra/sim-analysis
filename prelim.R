@@ -7,7 +7,7 @@ library(tidyverse)
 library(esquisse)
 
 data_dir = "./data"
-current_run_id = "run-2022-06-17-1"
+current_run_id = "run-2022-06-22-1"
 current_run_path = file.path(data_dir, current_run_id)
 
 output_dir = "./output"
@@ -75,6 +75,10 @@ generate_run_config_summary <- function(run_id, run_configs) {
 label_from_config_id <- function(config_id){
   label = ""
   
+  if(ncol(run_config_changed) == 0){
+    return(paste0("No changes between configs\nconfig-",config_id))
+  }
+  
   for(col_i in 1:ncol(run_config_changed[config_id,])) {
     label = paste(label, colnames(run_config_changed[config_id,])[col_i], "=", run_config_changed[config_id, col_i], "\n")
   }
@@ -89,8 +93,47 @@ property_from_config_id <- function(config_id, property_name){
 
 # Read run data
 run_configs = read_run_configs(current_run_path)
+
+
 run_host_allele_data = read_run_data(current_run_path, "host_allele_data.csv")
 run_host_allele_data_combined = bind_rows(run_host_allele_data, .id = "config_id")
+run_meta_data = read_run_data(current_run_path, "meta_data.csv")
+run_meta_data_combined = bind_rows(run_meta_data, .id="config_id")
+
+run_meta_data_combined = run_meta_data_combined %>% 
+  mutate(bInitialMode =
+    bInfection == 0 & 
+    bHostFitnessproportionalReproduction == 0 &
+    bPathogenFitnessproportionalReproduction == 0 &
+    bPathogenMutation == 0 &
+    bHostMutation == 0) %>%
+  mutate(bBurninMode =
+    generation == 0 |
+    bInfection == 0 & 
+    bHostFitnessproportionalReproduction == 0 &
+    bPathogenFitnessproportionalReproduction == 0 &
+    bPathogenMutation == 1 &
+    bHostMutation == 1) %>%
+  mutate(bCoevolutionMode = 
+    generation != 0 &
+    bInfection == 1 & 
+    bHostFitnessproportionalReproduction == 1 &
+    bPathogenFitnessproportionalReproduction == 1 &
+    bPathogenMutation == 1 &
+    bHostMutation == 1
+  ) %>%
+  mutate(bNoCoevolutionMode = 
+    generation != 0 &
+    bInfection == 1 & 
+    bHostFitnessproportionalReproduction == 1 &
+    bPathogenFitnessproportionalReproduction == 0 &
+    bPathogenMutation == 1 &
+    bHostMutation == 1
+  )
+
+
+
+
 
 # Create output folder for this run
 dir.create(file.path(output_dir, current_run_id), showWarnings = FALSE)
@@ -103,7 +146,10 @@ write.csv(run_config_summary, file.path(output_dir, current_run_id, "config_summ
 # Get all config vars that have been changed throughout the run
 run_config_changed_mask = run_config_summary %>% sapply(function(x) !length(unique(x)) == 1)
 run_config_changed = run_config_summary[, run_config_changed_mask]
+run_config_common = run_config_summary[1, !run_config_changed_mask]
 
+run_config_key_value = run_config_common %>% pivot_longer(cols = everything(), names_to = "property", values_to = "values")
+write.csv(run_config_key_value, file.path(output_dir, current_run_id, "config_common.csv"), row.names = FALSE)
 
 
 run_allele_counts = run_host_allele_data_combined %>% count(config_id, generation, species)
@@ -118,7 +164,8 @@ run_allele_counts_plt = ggplot(run_allele_counts_grouped) +
     color = species,
     group = species
   ) +
-  geom_line(size = 0.5) +
+  geom_line(size = 0.2) +
+  expand_limits(y=0) + 
   scale_color_distiller(palette = "Set1", direction = 1) +
   theme_minimal() +
   facet_wrap(
@@ -130,27 +177,28 @@ run_allele_counts_plt = ggplot(run_allele_counts_grouped) +
 run_allele_counts_plt
 ggsave(file.path(output_dir, current_run_id, "allele_counts.png"), plot = run_allele_counts_plt, width = 5000, height = 5000, units = "px")
 
-run_allele_frequencies_plt = ggplot(run_host_allele_data_combined) +
-  aes(
-    x = generation,
-    y = count,
-    #fill = allele_id,
-    color = created_at,
-    group = species
-  ) +
-  #geom_bar(position = "stack",stat = "identity") +
-  geom_step(size = 0.5) +
-  scale_color_distiller(palette = "Set1", direction = 1) +
-  theme_minimal() +
-  facet_wrap(
-    vars(config_id),
-    labeller=labeller(config_id = label_from_config_id)
-  )
+# run_allele_frequencies_plt = ggplot(run_host_allele_data_combined) +
+#   aes(
+#     x = generation,
+#     y = count,
+#     #fill = allele_id,
+#     color = created_at,
+#     group = species
+#   ) +
+#   #geom_bar(position = "stack",stat = "identity") +
+#   geom_step(size = 0.5) +
+#   scale_color_distiller(palette = "Set1", direction = 1) +
+#   expand_limits(y=0) + 
+#   theme_minimal() +
+#   facet_wrap(
+#     vars(config_id),
+#     labeller=labeller(config_id = label_from_config_id)
+#   )
 
-ggsave(file.path(output_dir, current_run_id, "allele_counts_step.png"), plot = run_allele_frequencies_plt, width = 2000, height = 1000, units = "px")
+#ggsave(file.path(output_dir, current_run_id, "allele_counts_step.png"), plot = run_allele_frequencies_plt, width = 2000, height = 1000, units = "px")
 
 
-esquisse::esquisser(run_allele_counts_grouped)
+#esquisse::esquisser(run_allele_counts_grouped)
 
 ## Reading data from config, config id 0 in this case
 # config0_path = file.path(current_run_path, "config-0")
