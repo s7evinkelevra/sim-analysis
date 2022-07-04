@@ -1,4 +1,6 @@
 /data
+/slurm-meta
 /.Rproj.user
 .RData
-
+.RDataTmp*
+.Rhistory
