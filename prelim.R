@@ -3,6 +3,8 @@ library(rjson)
 library(jsonlite)
 
 library(tidyverse)
+library(plotly)
+library(Cairo)
 
 library(esquisse)
 
@@ -88,9 +90,13 @@ add_data <- function(base, adding){
   return(left_join(base, adding, by = c("config_id", "generation")))
 }
 
+save_plot_defaults <- function(path, plt, width, height){
+  ggsave(path, plot = plt, width = width, height = height, dpi = "retina", device = "png", type="cairo", units = "px", bg = "#ffffff", limitsize = FALSE)
+}
+
 
 data_dir <- "./data"
-current_run_id <- "2022-07-04-1"
+current_run_id <- "2022-07-06-3"
 current_run_path <- file.path(data_dir, current_run_id)
 
 output_dir <- "./output"
@@ -102,6 +108,14 @@ run_configs = read_run_configs(current_run_path)
 # read allele frequency data
 run_host_allele_data = read_run_data(current_run_path, "host_allele_data.csv")
 run_host_allele_data_combined = bind_rows(run_host_allele_data, .id = "config_id")
+
+# read host data (infection/fitness data + ancestry)
+run_host_data = read_run_data(current_run_path, "host_data.csv")
+run_host_data_combined = bind_rows(run_host_data, .id = "config_id")
+
+# read host genome data (allele ids of all host individuals)
+run_host_genome_data = read_run_data(current_run_path, "host_genome_data.csv")
+run_host_genome_data_combined = bind_rows(run_host_genome_data, .id = "config_id")
 
 # read run meta data
 run_meta_data = read_run_data(current_run_path, "meta_data.csv")
@@ -139,14 +153,14 @@ run_meta_data_combined = run_meta_data_combined %>%
     bHostMutation == 1
 )
 
-
+## Housekeeping
 # Create output folder for this run
 dir.create(file.path(output_dir, current_run_id), showWarnings = FALSE)
 
+## Configs
 # Write summary of the configs to csv
 run_config_summary = generate_run_config_summary(current_run_id, run_configs)
 write.csv(run_config_summary, file.path(output_dir, current_run_id, "config_summary.csv"))
-
 
 # Get all config vars that have been changed throughout the run
 run_config_changed_mask = run_config_summary %>% sapply(function(x) !length(unique(x)) == 1)
@@ -157,6 +171,99 @@ run_config_common = run_config_summary[1, !run_config_changed_mask]
 run_config_key_value = run_config_common %>% pivot_longer(cols = everything(), names_to = "property", values_to = "values")
 write.csv(run_config_key_value, file.path(output_dir, current_run_id, "config_common.csv"), row.names = FALSE)
 
+
+## Fitness data
+run_host_data_combined_meta = add_data(run_host_data_combined, run_meta_data_combined) 
+
+# successful antigen presentations in the last generation
+run_host_data_last_gen_successful_presentation <- run_host_data_combined_meta %>%
+  group_by(config_id, species, successful_presentations) %>%
+  filter(generation == max(generation)) %>%
+  mutate(successful_presentations_fac = as.factor(successful_presentations))
+  
+
+run_host_data_last_gen_successful_presentation_dist_plt <- ggplot(run_host_data_last_gen_successful_presentation) +
+  aes(
+    x = config_id,
+    group = successful_presentations,
+    fill = successful_presentations_fac
+  ) +
+  geom_bar(position = "dodge") +
+  theme_minimal()
+
+run_host_data_last_gen_successful_presentation_dist_plt
+
+#plotly::ggplotly(run_host_data_last_gen_successful_presentation_dist_plt)
+save_plot_defaults(file.path(output_dir, current_run_id, "host_presentation_counts.png"), run_host_data_last_gen_successful_presentation_dist_plt, 3000, 1500)
+
+
+# average fitness over time
+run_host_data_fitness_mean_over_time <- run_host_data_combined_meta %>%
+  filter(bBurninMode == FALSE) %>%
+  group_by(config_id, generation, species) %>%
+  summarize(mean_fitness = mean(fitness), sd_fitness = sd(fitness))
+ 
+run_host_data_fitness_mean_over_time_plt <- ggplot(run_host_data_fitness_mean_over_time) +
+  aes(
+    x = generation,
+    y = mean_fitness,
+    group = config_id,
+    color = config_id
+  ) +
+  geom_hline(yintercept = as.numeric(run_config_common[1,"hosts.fitness_minimum"])) +
+  geom_point() +
+  geom_line() +
+  theme_minimal()
+
+
+run_host_data_fitness_mean_over_time_plt
+plotly::ggplotly(run_host_data_fitness_mean_over_time_plt)
+save_plot_defaults(file.path(output_dir, current_run_id, "host_fitness_mean.png"), run_host_data_fitness_mean_over_time_plt, 3000, 1500)
+
+
+## Heterozygosity
+run_host_genome_data_combined_meta = add_data(run_host_genome_data_combined, run_meta_data_combined)
+
+
+# add allele frequency data 
+run_host_genome_data_combined_meta_count_freq = run_host_genome_data_combined_meta %>% 
+  left_join(run_host_allele_data_combined, 
+                 by = c("config_id", "generation", "species", "locus_id","allele_1_id" = "allele_id"), 
+                 suffix = c(".allele_1", ".allele_2")) %>%
+  left_join(run_host_allele_data_combined,
+            by = c("config_id", "generation", "species", "locus_id","allele_2_id" = "allele_id"), 
+            suffix = c(".allele_1", ".allele_2"))
+
+
+
+run_host_genome_zygosity = run_host_genome_data_combined_meta %>%
+  mutate(zygosity = case_when(
+    allele_1_id == allele_2_id ~ "homozygous",
+    allele_1_id != allele_2_id ~ "heterozygous"
+  )) %>%
+  group_by(config_id, generation, species, locus_id) %>%
+  count(zygosity, name = "zygosity_count") %>%
+  pivot_wider(names_from = zygosity, values_from = zygosity_count) %>%
+  mutate(hobs = heterozygous/(homozygous+heterozygous))
+
+run_host_genome_zygosity_plt = ggplot(run_host_genome_zygosity) +
+  aes(
+    x = generation,
+    y = hobs,
+    group = config_id,
+    color = config_id
+  ) +
+  geom_line() + 
+  geom_vline(xintercept = as.numeric(run_config_common[1,"burnin_generations"])) + 
+  theme_minimal()
+
+run_host_genome_zygosity_plt
+
+
+# marginal fitness of alleles
+
+
+## Allele counts
 # get allele counts by config, generation and species
 run_allele_counts = run_host_allele_data_combined %>% count(config_id, generation, species)
 run_allele_counts_grouped = run_allele_counts %>% group_by(config_id)
@@ -206,16 +313,21 @@ allele_dist_first_last_plt
 run_allele_counts_last_100_box_plt = ggplot(run_allele_counts_last_100) +
   aes(
     x = bBurninMode,
-    y = n
+    y = n,
+    facet=config_id
   ) +
   geom_boxplot() +
   geom_jitter(width = 0.2, aes(color = config_id)) +
   theme_minimal() +
-  scale_y_continuous(breaks = seq(0, 1000, by = 10))
+  scale_y_continuous(breaks = seq(0, 1000, by = 10)) +
+  facet_wrap(
+    vars(config_id),
+    labeller=labeller(config_id = label_from_config_id)
+  )
 
 run_allele_counts_last_100_box_plt
 
-ggsave(file.path(output_dir, current_run_id, "allele_counts_box.png"), plot = run_allele_counts_last_100_box_plt, width = 3000, height = 3000, units = "px", bg = "#ffffff")
+save_plot_defaults(file.path(output_dir, current_run_id, "allele_counts_last_100_box.png"), run_allele_counts_last_100_box_plt, 3000, 3000)
 
 
 # allele counts over time
@@ -237,7 +349,7 @@ run_allele_counts_plt = ggplot(run_allele_counts_grouped) +
 
 
 run_allele_counts_plt
-ggsave(file.path(output_dir, current_run_id, "allele_counts.png"), plot = run_allele_counts_plt, width = 5000, height = 5000, units = "px", bg = "#ffffff")
+save_plot_defaults(file.path(output_dir, current_run_id, "allele_counts.png"), run_allele_counts_plt, 20000, 5000)
 
 # run_allele_frequencies_plt = ggplot(run_host_allele_data_combined) +
 #   aes(
