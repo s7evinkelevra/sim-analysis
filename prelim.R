@@ -1,3 +1,5 @@
+rm(list = ls())
+
 library(tools)
 library(rjson)
 library(jsonlite)
@@ -12,10 +14,8 @@ library(esquisse)
 
 source("./help.R")
 
-rm(list = ls())
-
 data_dir <- "./data"
-current_run_id <- "run-2022-06-22-1"
+current_run_id <- "2022-07-14-25"
 current_run_path <- file.path(data_dir, current_run_id)
 
 output_dir <- "./output"
@@ -85,6 +85,7 @@ run_host_data_combined_meta = add_data(run_host_data_combined, run_meta_data_com
 # read host genome data (allele ids of all host individuals)
 run_host_genome_data = read_run_data(current_run_path, "host_genome_data.csv")
 run_host_genome_data_combined = bind_rows(run_host_genome_data, .id = "config_id")
+run_host_genome_data_combined_meta = add_data(run_host_genome_data_combined, run_meta_data_combined)
 
 # read pathogen data
 run_pathogen_data = read_run_data(current_run_path, "pathogen_data.csv")
@@ -119,11 +120,14 @@ run_config_key_value = run_config_common %>% pivot_longer(cols = everything(), n
 write.csv(run_config_key_value, file.path(output_dir, current_run_id, "config_common.csv"), row.names = FALSE)
 
 
+
+
+
 #### Process host fitness data
 
 ## successful antigen presentations in the last generation
 run_host_data_last_gen_successful_presentation <- run_host_data_combined_meta %>%
-  group_by(config_id, species, successful_presentations) %>%
+  group_by(config_id, species) %>%
   filter(generation == max(generation)) %>%
   mutate(successful_presentations_fac = as.factor(successful_presentations))
   
@@ -158,55 +162,124 @@ run_host_data_successful_presentation_dist_plt <- ggplot(run_host_data_successfu
 run_host_data_successful_presentation_dist_plt
 save_plot_defaults(file.path(output_dir, current_run_id, "host_presentation_counts_all.png"), run_host_data_successful_presentation_dist_plt, 3000, 1500)
 
-# average/mean fitness over time
+## host fitness distribution
+run_host_data_combined_meta_no_burnin = run_host_data_combined_meta %>%
+  group_by(config_id, species) %>%
+  filter(bBurninMode == FALSE)
+
+run_host_data_combined_meta_last_generation = run_host_data_combined_meta %>%
+  group_by(config_id, species) %>%
+  filter(generation == max(generation))
+
+run_host_fitness_dist_last_gen_plt = ggplot(run_host_data_combined_meta_last_generation) +
+  aes(
+    x = fitness,
+    group = config_id,
+    color = fitness,
+    fill = fitness,
+    facet = config_id
+  ) +
+  geom_bar(aes(fill = fitness)) +
+  theme_minimal() +
+  facet_wrap(
+    vars(config_id)
+  )
+
+
+run_host_fitness_dist_last_gen_plt
+save_plot_defaults(file.path(output_dir, current_run_id, "host_fitness_dist_last_gen.png"), run_host_fitness_dist_last_gen_plt, 3000, 1500)
+
+
+run_host_fitness_dist_no_burnin_plt = ggplot(run_host_data_combined_meta_no_burnin) +
+  aes(
+    x = fitness,
+    group = config_id,
+    color = fitness,
+    fill = fitness,
+    facet = config_id
+  ) +
+  geom_bar(aes(fill = fitness)) +
+  theme_minimal() +
+  facet_wrap(
+    vars(config_id)
+  )
+
+run_host_fitness_dist_no_burnin_plt
+save_plot_defaults(file.path(output_dir, current_run_id, "host_fitness_dist_no_burnin.png"), run_host_fitness_dist_no_burnin_plt, 3000, 1500)
+
+
+## host fitness over time summary
 run_host_data_fitness_summary <- run_host_data_combined_meta %>%
   group_by(config_id, generation, species, bBurninMode) %>%
-  summarize(mean_fitness = mean(fitness), sd_fitness = sd(fitness), cv_fitness = cv(fitness), .groups = "keep")
+  summarize(fitness_mean = mean(fitness), fitness_sd = sd(fitness), fitness_cv = cv(fitness), fitness_median = median(fitness), .groups = "keep")
 
-run_host_data_fitness_summary_no_burnin = run_host_data_fitness_summary_over_time %>%
+run_host_data_fitness_summary_no_burnin = run_host_data_fitness_summary %>%
   filter(bBurninMode == FALSE)
 
 
-run_host_data_fitness_mean_over_time_plt <- ggplot(run_host_data_fitness_summary_no_burnin) +
+# plt: fitness mean over time
+#TODO(JAN): add CI whiskers
+run_host_data_fitness_mean_over_time_plt_autoscale <- ggplot(run_host_data_fitness_summary_no_burnin) +
   aes(
     x = generation,
-    y = mean_fitness,
+    y = fitness_mean,
     group = interaction(config_id, species),
     color = config_id
   ) +
   geom_hline(yintercept = as.numeric(run_config_common[1,"hosts.fitness_minimum"])) +
   geom_point() +
   geom_line() +
-  ylim(0,1) + 
   theme_minimal()
 
+run_host_data_fitness_mean_over_time_plt_autoscale
+save_plot_defaults(file.path(output_dir, current_run_id, "host_fitness_mean_autoscale.png"), run_host_data_fitness_mean_over_time_plt_autoscale, 3000, 1500)
 
-run_host_data_fitness_mean_over_time_plt
-#plotly::ggplotly(run_host_data_fitness_mean_over_time_plt)
+run_host_data_fitness_mean_over_time_plt = run_host_data_fitness_mean_over_time_plt_autoscale + ylim(0,1)
 save_plot_defaults(file.path(output_dir, current_run_id, "host_fitness_mean.png"), run_host_data_fitness_mean_over_time_plt, 3000, 1500)
 
 
-# plot host fitness coefficient of variation (measure of dispersion)
+run_host_data_fitness_mean_over_time_plt_autoscale_facet <- ggplot(run_host_data_fitness_summary_no_burnin) +
+  aes(
+    x = generation,
+    y = fitness_mean,
+    group = interaction(config_id, species),
+    color = config_id,
+    facet = config_id
+  ) +
+  geom_hline(yintercept = as.numeric(run_config_common[1,"hosts.fitness_minimum"])) +
+  geom_point() +
+  geom_line() +
+  theme_minimal() +
+  facet_wrap(
+    vars(config_id)
+  )
+
+run_host_data_fitness_mean_over_time_plt_autoscale_facet
+save_plot_defaults(file.path(output_dir, current_run_id, "host_fitness_mean_autoscale_facet.png"), run_host_data_fitness_mean_over_time_plt_autoscale_facet, 3000, 1500)
+
+
+# plt host fitness coefficient of variation (measure of dispersion) over time
 # here: standin for selection
 run_host_data_fitness_cv_no_burnin_plt <- ggplot(run_host_data_fitness_summary_no_burnin) +
   aes(
     x = generation,
-    y = cv_fitness,
-    group = config_id,
+    y = fitness_cv,
+    group = interaction(config_id, species),
     color = config_id
   ) +
   geom_point() +
   geom_line() +
   theme_minimal()
 
+
 run_host_data_fitness_cv_no_burnin_plt
 save_plot_defaults(file.path(output_dir, current_run_id, "host_fitness_cv.png"), run_host_data_fitness_cv_no_burnin_plt, 3000, 1500)
 
-
+# plt fitness cv
 run_host_data_fitness_cv_box_plt <- ggplot(run_host_data_fitness_summary_no_burnin) +
   aes(
     x = config_id,
-    y = cv_fitness
+    y = fitness_cv
   ) +
   geom_boxplot() +
   geom_jitter(width = 0.2, aes(color = config_id)) +
@@ -216,43 +289,48 @@ run_host_data_fitness_cv_box_plt
 save_plot_defaults(file.path(output_dir, current_run_id, "host_fitness_cv_box.png"), run_host_data_fitness_cv_box_plt, 3000, 1500)
 
 
+#### Process pathogen fitness data ####
 
-
-run_pathogen_data_fitness_mean_over_time <- run_pathogen_data_combined_meta %>%
+### pathogen fitness over time summary
+run_pathogen_data_fitness_mean_over_time_burnin_infecting <- run_pathogen_data_combined_meta %>%
   filter(bBurninMode == FALSE & total_infections > 0) %>%
   group_by(config_id, generation, species) %>%
-  summarise(mean_fitness = mean(fitness), sd_fitness = sd(fitness), .groups = "keep")
+  summarise(fitness_mean = mean(fitness), fitness_sd = sd(fitness), fitness_cv = cv(fitness), fitness_median = median(fitness), .groups = "keep")
 
 
-run_pathogen_data_fitness_mean_over_time_plt <- ggplot(run_pathogen_data_fitness_mean_over_time) +
+run_pathogen_data_fitness_mean_no_burnin_infecting_plt_autoscale <- ggplot(run_pathogen_data_fitness_mean_over_time_burnin_infecting) +
   aes(
     x = generation,
-    y = mean_fitness,
+    y = fitness_mean,
     group = interaction(config_id, species),
     color = config_id
   ) +
   geom_hline(yintercept = as.numeric(run_config_common[1,"pathogens.fitness_minimum"])) +
   geom_point() +
   geom_line() +
-  ylim(0,1) + 
   theme_minimal()
 
-run_pathogen_data_fitness_mean_over_time_plt
-save_plot_defaults(file.path(output_dir, current_run_id, "pathogen_fitness_mean.png"), run_pathogen_data_fitness_mean_over_time_plt, 3000, 1500)
+run_pathogen_data_fitness_mean_no_burnin_infecting_plt_autoscale
+save_plot_defaults(file.path(output_dir, current_run_id, "pathogen_fitness_mean_no_burnin_infecting_autoscale.png"), run_pathogen_data_fitness_mean_no_burnin_infecting_plt_autoscale, 3000, 1500)
 
 
-## Heterozygosity
-run_host_genome_data_combined_meta = add_data(run_host_genome_data_combined, run_meta_data_combined)
+run_pathogen_data_fitness_mean_no_burnin_infecting_plt = run_pathogen_data_fitness_mean_no_burnin_infecting_plt_autoscale + ylim(0,1)
+run_pathogen_data_fitness_mean_no_burnin_infecting_plt
+save_plot_defaults(file.path(output_dir, current_run_id, "pathogen_fitness_mean_no_burnin_infecting.png"), run_pathogen_data_fitness_mean_no_burnin_infecting_plt, 3000, 1500)
 
+
+
+#### Process host heterozygosity ####
 
 # add allele frequency data 
-run_host_genome_data_combined_meta_count_freq = run_host_genome_data_combined_meta %>% 
-  left_join(run_host_allele_data_combined, 
-                 by = c("config_id", "generation", "species", "locus_id","allele_1_id" = "allele_id"), 
-                 suffix = c(".allele_1", ".allele_2")) %>%
-  left_join(run_host_allele_data_combined,
-            by = c("config_id", "generation", "species", "locus_id","allele_2_id" = "allele_id"), 
-            suffix = c(".allele_1", ".allele_2"))
+# currently not used
+# run_host_genome_data_combined_meta_count_freq = run_host_genome_data_combined_meta %>% 
+#   left_join(run_host_allele_data_combined, 
+#                  by = c("config_id", "generation", "species", "locus_id","allele_1_id" = "allele_id"), 
+#                  suffix = c(".allele_1", ".allele_2")) %>%
+#   left_join(run_host_allele_data_combined,
+#             by = c("config_id", "generation", "species", "locus_id","allele_2_id" = "allele_id"), 
+#             suffix = c(".allele_1", ".allele_2"))
 
 
 # calculate Hexp 
@@ -264,7 +342,7 @@ run_host_allele_data_hexp = run_host_allele_data_combined_meta %>%
   mutate(hexp = 1 - freq_sq_sum)
 
 
-
+# add label to individuals
 run_host_data_combined_meta_genome = run_host_data_combined_meta %>%
   left_join(run_host_genome_data_combined, by = c("config_id", "generation", "species", "id")) %>%
   mutate(zygosity = case_when(
@@ -272,10 +350,11 @@ run_host_data_combined_meta_genome = run_host_data_combined_meta %>%
     allele_1_id != allele_2_id ~ "heterozygous"
   ))
 
+# filter by burnin
 run_host_data_combined_meta_genome_no_burnin = run_host_data_combined_meta_genome %>%
   filter(bBurninMode == FALSE)
 
-
+# summarize by zygosity
 run_host_data_summary_by_zygosity = run_host_data_combined_meta_genome %>%
   group_by(config_id, generation, species, locus_id, zygosity, bBurninMode) %>%
   summarise(fitness_mean = mean(fitness), fitness_sd = sd(fitness), fitness_cv = cv(fitness), .groups = "keep")
@@ -286,7 +365,8 @@ run_host_data_summary_by_zygosity_no_burnin = run_host_data_combined_meta_genome
   summarise(fitness_mean = mean(fitness), fitness_sd = sd(fitness), fitness_cv = cv(fitness), .groups = "keep")
 
 
-run_host_data_summary_by_zygosity_plt = ggplot(run_host_data_summary_by_zygosity) + 
+# plt fitness over time by zygosity
+run_host_data_summary_by_zygosity_no_burnin_plt = ggplot(run_host_data_summary_by_zygosity_no_burnin) + 
   aes(
     x = generation,
     y = fitness_mean,
@@ -302,12 +382,11 @@ run_host_data_summary_by_zygosity_plt = ggplot(run_host_data_summary_by_zygosity
     vars(config_id),
   )
 
-run_host_data_summary_by_zygosity_plt
+run_host_data_summary_by_zygosity_no_burnin_plt
+save_plot_defaults(file.path(output_dir, current_run_id, "host_fitness_mean_by_zygosity_no_burnin.png"), run_host_data_summary_by_zygosity_no_burnin_plt, 5000, 3000)
 
-save_plot_defaults(file.path(output_dir, current_run_id, "host_fitness_mean_by_zygosity.png"), run_host_data_summary_by_zygosity_plt, 5000, 3000)
-
-
-run_host_data_combined_meta_genome_box_plt = ggplot(run_host_data_summary_by_zygosity_no_burnin) + 
+# plt fitness over zygosity
+run_host_data_combined_meta_genome_box_no_burnin_plt = ggplot(run_host_data_summary_by_zygosity_no_burnin) + 
   aes(
     x = zygosity,
     y = fitness_mean,
@@ -320,11 +399,11 @@ run_host_data_combined_meta_genome_box_plt = ggplot(run_host_data_summary_by_zyg
     vars(config_id)
   )
 
-run_host_data_combined_meta_genome_box_plt
-save_plot_defaults(file.path(output_dir, current_run_id, "host_fitness_mean_by_zygosity_box.png"), run_host_data_combined_meta_genome_box_plt, 5000, 3000)
+run_host_data_combined_meta_genome_box_no_burnin_plt
+save_plot_defaults(file.path(output_dir, current_run_id, "host_fitness_mean_by_zygosity_box_no_burnin.png"), run_host_data_combined_meta_genome_box_no_burnin_plt, 5000, 3000)
 
 
-
+## calculate hobserved vs hexpected
 run_host_genome_zygosity_counts = run_host_genome_data_combined_meta %>%
   mutate(zygosity = case_when(
     allele_1_id == allele_2_id ~ "homozygous",
@@ -359,7 +438,7 @@ run_host_genome_hobs_hexp_plt = ggplot(run_host_genome_hobs_hexp) +
   )
 
 run_host_genome_hobs_hexp_plt
-save_plot_defaults(file.path(output_dir, current_run_id, "heterozygosity.png"), run_host_genome_hobs_hexp_plt, 5000, 3000)
+save_plot_defaults(file.path(output_dir, current_run_id, "host_heterozygosity.png"), run_host_genome_hobs_hexp_plt, 5000, 3000)
 
 run_host_genome_hobs_over_hexp_plt = ggplot(run_host_genome_hobs_hexp) +
   aes(
@@ -373,7 +452,7 @@ run_host_genome_hobs_over_hexp_plt = ggplot(run_host_genome_hobs_hexp) +
   theme_minimal()
 
 run_host_genome_hobs_over_hexp_plt
-save_plot_defaults(file.path(output_dir, current_run_id, "hobs_over_hexp.png"), run_host_genome_hobs_over_hexp_plt, 5000, 3000)
+save_plot_defaults(file.path(output_dir, current_run_id, "host_hobs_over_hexp.png"), run_host_genome_hobs_over_hexp_plt, 5000, 3000)
 
 
 run_host_genome_hobs_minus_hexp_plt = ggplot(run_host_genome_hobs_hexp) +
@@ -392,19 +471,21 @@ run_host_genome_hobs_minus_hexp_plt = ggplot(run_host_genome_hobs_hexp) +
   )
 
 run_host_genome_hobs_minus_hexp_plt
-save_plot_defaults(file.path(output_dir, current_run_id, "hobs_minus_hexp.png"), run_host_genome_hobs_minus_hexp_plt, 5000, 3000)
+save_plot_defaults(file.path(output_dir, current_run_id, "host_hobs_minus_hexp.png"), run_host_genome_hobs_minus_hexp_plt, 5000, 3000)
 
 
-# marginal fitness of alleles
+#### calculate host marginal fitness of alleles ####
+# WIP
+
 run_host_data_combined_meta_genome_longer_by_allele = run_host_data_combined_meta_genome %>%
   pivot_longer(cols = c("allele_1_id", "allele_2_id"), names_to = "chromosome", values_to = "allele_id")
 
-run_host_data_marginal_fitness_summary = run_host_data_combined_meta_genome_longer_by_allele %>%
+run_host_data_marginal_fitness_summary_no_burnin = run_host_data_combined_meta_genome_longer_by_allele %>%
   filter(bBurninMode == FALSE) %>%
   group_by(config_id, generation, species, allele_id) %>%
   summarise(marginal_fitness_mean = mean(fitness), marginal_fitness_sd = sd(fitness), marginal_fitness_cv = cv(fitness), .groups = "keep")
 
-run_host_data_marginal_fitness_mean_plt = ggplot(run_host_data_marginal_fitness_summary) +
+run_host_data_marginal_fitness_mean_no_burnin_plt = ggplot(run_host_data_marginal_fitness_summary_no_burnin) +
   aes(
     x = generation,
     y = marginal_fitness_mean,
@@ -419,26 +500,28 @@ run_host_data_marginal_fitness_mean_plt = ggplot(run_host_data_marginal_fitness_
     vars(config_id)
   )
 
-run_host_data_marginal_fitness_mean_plt
+#run_host_data_marginal_fitness_mean_no_burnin_plt
+# maybe not that interesting as its basically just the mean fitness(?)
 #TODO(JAN): save plot
 
-run_host_data_marginal_fitness_mean_box_plt = ggplot(run_host_data_marginal_fitness_summary) +
+run_host_data_marginal_fitness_mean_box_no_burnin_plt = ggplot(run_host_data_marginal_fitness_summary_no_burnin) +
   aes(
     x = generation,
     y = marginal_fitness_mean,
     group = generation,
+    color = config_id,
     facet = config_id
   ) +
-  geom_boxplot() + 
+  geom_violin() + 
   theme_minimal() +
   facet_wrap(
     vars(config_id)
   )
 
-run_host_data_marginal_fitness_mean_box_plt
+run_host_data_marginal_fitness_mean_box_no_burnin_plt
 
 
-run_host_data_marginal_fitness_summary_frequencies = run_host_data_marginal_fitness_summary %>%
+run_host_data_marginal_fitness_summary_frequencies = run_host_data_marginal_fitness_summary_no_burnin %>%
   left_join(run_host_allele_data_combined, by = c("config_id", "generation", "species", "allele_id"))
 
 
