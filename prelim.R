@@ -42,35 +42,7 @@ run_meta_data = read_run_data(current_run_path, "meta_data.csv")
 run_meta_data_combined = bind_rows(run_meta_data, .id="config_id")
 
 # build mode info from flags
-run_meta_data_combined = run_meta_data_combined %>% 
-  mutate(bInitialMode =
-           bInfection == 0 & 
-           bHostFitnessproportionalReproduction == 0 &
-           bPathogenFitnessproportionalReproduction == 0 &
-           bPathogenMutation == 0 &
-           bHostMutation == 0) %>%
-  mutate(bBurninMode =
-           generation == 0 |
-           bHostFitnessproportionalReproduction == 0 &
-           bPathogenFitnessproportionalReproduction == 0 &
-           bPathogenMutation == 1 &
-           bHostMutation == 1) %>%
-  mutate(bCoevolutionMode = 
-           generation != 0 &
-           bInfection == 1 & 
-           bHostFitnessproportionalReproduction == 1 &
-           bPathogenFitnessproportionalReproduction == 1 &
-           bPathogenMutation == 1 &
-           bHostMutation == 1
-  ) %>%
-  mutate(bNoCoevolutionMode = 
-           generation != 0 &
-           bInfection == 1 & 
-           bHostFitnessproportionalReproduction == 1 &
-           bPathogenFitnessproportionalReproduction == 0 &
-           bPathogenMutation == 1 &
-           bHostMutation == 1
-  )
+run_meta_data_combined = add_sim_mode(run_meta_data_combined)
 
 # read allele frequency data
 run_host_allele_data = read_run_data(current_run_path, "host_allele_data.csv")

@@ -57,6 +57,45 @@ generate_run_config_summary <- function(run_id, run_configs) {
   return(config_tibble)
 }
 
+add_sim_mode <- function(meta_data_tibble) {
+  return(
+    meta_data_tibble %>% 
+      mutate(bInitialMode =
+               bInfection == 0 & 
+               bHostFitnessproportionalReproduction == 0 &
+               bPathogenFitnessproportionalReproduction == 0 &
+               bPathogenMutation == 0 &
+               bHostMutation == 0) %>%
+      mutate(bBurninMode =
+               generation == 0 |
+               bHostFitnessproportionalReproduction == 0 &
+               bPathogenFitnessproportionalReproduction == 0 &
+               bPathogenMutation == 1 &
+               bHostMutation == 1) %>%
+      mutate(bCoevolutionMode = 
+               generation != 0 &
+               bInfection == 1 & 
+               bHostFitnessproportionalReproduction == 1 &
+               bPathogenFitnessproportionalReproduction == 1 &
+               bPathogenMutation == 1 &
+               bHostMutation == 1
+      ) %>%
+      mutate(bNoCoevolutionMode = 
+               generation != 0 &
+               bInfection == 1 & 
+               bHostFitnessproportionalReproduction == 1 &
+               bPathogenFitnessproportionalReproduction == 0 &
+               bPathogenMutation == 1 &
+               bHostMutation == 1
+      ) %>%
+      mutate(derived_sim_mode = case_when(
+        bBurninMode ~ "neutrality",
+        bCoevolutionMode ~ "coevolution",
+        bNoCoevolutionMode ~ "no-coevolution"
+      ))
+  )
+}
+
 
 label_from_config_id <- function(config_id){
   label = ""
