@@ -89,9 +89,9 @@ add_sim_mode <- function(meta_data_tibble) {
                bHostMutation == 1
       ) %>%
       mutate(derived_sim_mode = case_when(
-        bBurninMode ~ "neutrality",
-        bCoevolutionMode ~ "coevolution",
-        bNoCoevolutionMode ~ "no-coevolution"
+        bBurninMode ~ "Neutrality",
+        bCoevolutionMode ~ "Coevolution",
+        bNoCoevolutionMode ~ "No-coevolution"
       ))
   )
 }

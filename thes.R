@@ -17,14 +17,6 @@ library(esquisse)
 
 source("./help.R")
 
-data_dir <- "./data"
-output_dir <- "./output"
-
-analysis_id <- "scenario_3"
-output_path <- file.path(output_dir, analysis_id)
-dir.create(output_path, showWarnings = FALSE)
-
-
 build_run_ids_same_date <- function(date_base, from, to){
   run_ids = c()
   for(id in from:to){
@@ -88,11 +80,34 @@ merge_by_paste_if_unequal <- function(x) {
   }
 }
 
-run_ids = build_run_ids_same_date("2022-07-14",1,48)
+label_from_id <- function(id) {
+  row_id_analysis_configs = analysis_configs_merged_unique_changed %>%
+    column_to_rownames("id_same_config_different_mode") %>%
+    select((!run_id_same_config_different_mode & !hash_no_sim_mode))
+  
+  label = ""
+  
+  for(col_i in 1:ncol(row_id_analysis_configs[id,])) {
+    label = paste(label, colnames(row_id_analysis_configs[id,])[col_i], "=", row_id_analysis_configs[id, col_i], "\n")
+  }
+  
+  return(label)
+}
+
+
+data_dir <- "./data"
+output_dir <- "./output"
+
+analysis_id <- "scenario_2"
+output_path <- file.path(output_dir, analysis_id)
+dir.create(output_path, showWarnings = FALSE)
+
+
+
+run_ids = build_run_ids_same_date("2022-07-17",1,32)
 
 
 analysis_configs = read_analysis_configs(run_ids)
-write.csv(analysis_configs, file.path(output_path, "config_summary.csv"))
 
 # needs to be executed in one go, else hash might change???
 analysis_configs$hash_no_sim_mode = analysis_configs %>% select((!run_id & !simulation_mode)) %>% apply(1, digest)
@@ -125,8 +140,9 @@ analysis_configs_merged_unique_changed = analysis_configs_merged_unique[, analys
 analysis_configs_merged_unique_common = analysis_configs_merged_unique[1, !analysis_configs_merged_unique_changed_mask]
 
 
-
-
+write.csv(analysis_configs_merged, file.path(output_path, "config_summary.csv"))
+write.csv(analysis_configs_merged_changed, file.path(output_path, "config_changed.csv"))
+write.csv(analysis_configs_merged_common, file.path(output_path, "config_common.csv"))
 
 gc()
 analysis_meta_data = read_analysis_data(run_ids, "meta_data.csv") %>% add_sim_mode()
@@ -139,7 +155,7 @@ analysis_host_allele_counts = analysis_host_allele_data %>%
 
 analysis_host_allele_counts_meta = analysis_host_allele_counts %>%
   add_meta_data_analysis(analysis_meta_data) %>%
-  add_run_config_analysis(analysis_configs_merged_changed)
+  add_run_config_analysis(analysis_configs_merged)
 
 
 
@@ -151,13 +167,13 @@ analysis_host_allele_counts_meta_last_100_by_sim_mode = analysis_host_allele_cou
 
 analysis_host_allele_counts_meta_last_100_by_config_id_summary = analysis_host_allele_counts_meta_last_100_by_sim_mode %>%
   summarise(allele_count_mean = mean(n), allele_count_sd = sd(n), allele_count_median = median(n), .groups = "keep") %>%
-  add_merged_run_config_analysis(analysis_configs_merged_unique_changed)
+  add_merged_run_config_analysis(analysis_configs_merged_unique)
 
 
 analysis_host_allele_counts_meta_last_100_summary = analysis_host_allele_counts_meta_last_100_by_sim_mode %>%
   group_by(run_id_same_config_different_mode, locus_id, derived_sim_mode) %>%
   summarise(allele_count_mean = mean(n), allele_count_sd = sd(n), allele_count_median = median(n), .groups = "keep") %>%
-  add_merged_run_config_analysis(analysis_configs_merged_unique_changed)
+  add_merged_run_config_analysis(analysis_configs_merged_unique)
 
 
 ###### Testing ######
@@ -253,11 +269,80 @@ analysis_host_allele_counts_meta_last_100_summary_introgression_plt_box = ggplot
     vars(id_same_config_different_mode)
   )
 
+analysis_host_allele_counts_meta_last_100_summary_stat_pw_t_test = analysis_host_allele_counts_meta_last_100_by_config_id_summary %>%
+  group_by(id_same_config_different_mode) %>%
+  pairwise_t_test(allele_count_mean ~ derived_sim_mode) %>%
+  adjust_pvalue(method = "bonferroni") %>%
+  add_significance() %>%
+  add_xy_position(x = "derived_sim_mode")
+
+
+analysis_host_allele_counts_meta_last_100_summary_plt_box = ggplot(analysis_host_allele_counts_meta_last_100_by_config_id_summary) +
+  aes(
+    x = derived_sim_mode,
+    y = allele_count_mean,
+    color = derived_sim_mode,
+    facet = id_same_config_different_mode
+  ) + 
+  geom_boxplot() +
+  theme_minimal() + 
+  stat_pvalue_manual(analysis_host_allele_counts_meta_last_100_summary_stat_pw_t_test) +
+  facet_wrap(
+    . ~ id_same_config_different_mode,
+    labeller = labeller(id_same_config_different_mode = label_from_id )
+  )
+
+
+analysis_host_allele_counts_meta_last_100_summary_grid_stat_shapiro_test = analysis_host_allele_counts_meta_last_100_by_config_id_summary %>%
+  filter(infection.merit_threshold == 4) %>%
+  group_by(pathogens.introgression_individuals_per_generation,hosts.species_n,pathogens.species_n) %>%
+  # scenario 2 with threshold group_by(pathogens.introgression_individuals_per_generation,hosts.species_n,pathogens.species_n,infection.merit_threshold) %>%
+  # other scenarios group_by(derived_sim_mode, pathogens.introgression_individuals_per_generation, hosts.mutation_rate_per_peptide, pathogens.species_n, pathogens.mutation_rate_per_peptide) %>%
+  group_by(id_same_config_different_mode, derived_sim_mode) %>%
+  shapiro_test(allele_count_mean) %>%
+  add_significance()
+
+analysis_host_allele_counts_meta_last_100_summary_grid_stat_pw_t_test = analysis_host_allele_counts_meta_last_100_by_config_id_summary %>%
+  filter(infection.merit_threshold == 4) %>%
+  group_by(pathogens.introgression_individuals_per_generation,hosts.species_n,pathogens.species_n) %>%
+  # scenario 2 with threshold group_by(pathogens.introgression_individuals_per_generation,hosts.species_n,pathogens.species_n,infection.merit_threshold) %>%
+  # other scenarios group_by(pathogens.introgression_individuals_per_generation, hosts.mutation_rate_per_peptide, pathogens.species_n, pathogens.mutation_rate_per_peptide) %>%
+  pairwise_t_test(allele_count_mean ~ derived_sim_mode) %>%
+  adjust_pvalue(method = "bonferroni") %>%
+  add_significance() %>%
+  add_xy_position(x = "derived_sim_mode")
+
+analysis_host_allele_counts_meta_last_100_summary_grid_plt_box = ggplot(analysis_host_allele_counts_meta_last_100_by_config_id_summary %>% filter(infection.merit_threshold == 4)) +
+  aes(
+    x = derived_sim_mode,
+    y = allele_count_mean,
+    color = derived_sim_mode,
+    #facet = id_same_config_different_mode
+  ) + 
+  geom_boxplot() +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
+  #theme_minimal() + 
+  stat_pvalue_manual(analysis_host_allele_counts_meta_last_100_summary_grid_stat_pw_t_test) +
+  facet_grid(
+    pathogens.introgression_individuals_per_generation + hosts.species_n  ~ pathogens.species_n,
+    # scenario 2 with threshold pathogens.introgression_individuals_per_generation + hosts.species_n  ~ pathogens.species_n + infection.merit_threshold,
+    #other scenarios: pathogens.introgression_individuals_per_generation + hosts.mutation_rate_per_peptide  ~ pathogens.species_n + pathogens.mutation_rate_per_peptide,
+    #labeller = labeller(id_same_config_different_mode = label_from_id ),
+    scales = "free_x",
+    labeller = label_both
+  )
+
+
+
 analysis_host_allele_counts_meta_last_100_summary_no_introgression_plt_box 
 analysis_host_allele_counts_meta_last_100_summary_introgression_plt_box
+analysis_host_allele_counts_meta_last_100_summary_plt_box
+analysis_host_allele_counts_meta_last_100_summary_grid_plt_box
 
 save_plot_defaults(file.path(output_path, "analysis_host_allele_counts_meta_last_100_summary_no_introgression_plt_box.png"),analysis_host_allele_counts_meta_last_100_summary_no_introgression_plt_box, 3000, 3000 )
 save_plot_defaults(file.path(output_path, "analysis_host_allele_counts_meta_last_100_summary_introgression_plt_box.png"),analysis_host_allele_counts_meta_last_100_summary_introgression_plt_box, 3000, 3000 )
+save_plot_defaults(file.path(output_path, "analysis_host_allele_counts_meta_last_100_summary_plt_box.png"),analysis_host_allele_counts_meta_last_100_summary_plt_box, 3000, 3000 )
+save_plot_defaults(file.path(output_path, "analysis_host_allele_counts_meta_last_100_summary_grid_plt_box.png"),analysis_host_allele_counts_meta_last_100_summary_grid_plt_box, 3000, 5000 )
 
 
 analysis_host_allele_counts_meta_last_100_summary_no_introgression_id_plt_box = ggplot(analysis_host_allele_counts_meta_last_100_by_config_id_summary %>%
@@ -293,17 +378,24 @@ analysis_host_allele_counts_meta_last_100_summary_introgression_id_plt_box = ggp
     ~ derived_sim_mode, scales = "free_x"
   )
 
-analysis_host_allele_counts_meta_last_100_summary_id_plt_box = ggplot(analysis_host_allele_counts_meta_last_100_by_config_id_summary) +
+analysis_host_allele_counts_meta_last_100_summary_id_plt_box = ggplot(analysis_host_allele_counts_meta_last_100_by_config_id_summary %>% filter(infection.merit_threshold == 4)) +
   aes(
-    x = pathogens.mutation_rate_per_peptide,
+    x = hosts.species_n,
+    # other scenarios x = pathogens.mutation_rate_per_peptide,
     y = allele_count_mean,
-    group = pathogens.mutation_rate_per_peptide,
+    group = hosts.species_n,
+    # other scenarios group = pathogens.mutation_rate_per_peptide,
     color = derived_sim_mode,
     facet = derived_sim_mode
   ) + 
   geom_boxplot() +
+  # other scenarios theme(axis.text.x = element_text(angle = -45, hjust = 0, vjust = 0.5)) +
   facet_grid(
-    . ~ derived_sim_mode + pathogens.introgression_individuals_per_generation + hosts.mutation_rate_per_peptide + pathogens.species_n, scales = "free_x"
+    . ~ derived_sim_mode + pathogens.introgression_individuals_per_generation + pathogens.species_n,
+    # scenario 2 with threshold . ~ derived_sim_mode + pathogens.introgression_individuals_per_generation + infection.merit_threshold + pathogens.species_n,
+    # other scenarios . ~ derived_sim_mode + hosts.mutation_rate_per_peptide +  pathogens.introgression_individuals_per_generation + pathogens.species_n, 
+    # labeller = label_both,
+    # scenario 1: scales = "free_x"
   )
 
 
@@ -314,7 +406,7 @@ analysis_host_allele_counts_meta_last_100_summary_id_plt_box
 
 save_plot_defaults(file.path(output_path, "analysis_host_allele_counts_meta_last_100_summary_no_introgression_id_plt_box.png"),analysis_host_allele_counts_meta_last_100_summary_no_introgression_id_plt_box, 3000, 3000 )
 save_plot_defaults(file.path(output_path, "analysis_host_allele_counts_meta_last_100_summary_introgression_id_plt_box.png"),analysis_host_allele_counts_meta_last_100_summary_introgression_id_plt_box, 3000, 3000 )
-save_plot_defaults(file.path(output_path, "analysis_host_allele_counts_meta_last_100_summary_id_plt_box.png"),analysis_host_allele_counts_meta_last_100_summary_id_plt_box, 5000, 3000 )
+save_plot_defaults(file.path(output_path, "analysis_host_allele_counts_meta_last_100_summary_id_plt_box.png"),analysis_host_allele_counts_meta_last_100_summary_id_plt_box, 7600, 3000 )
 
 
 
@@ -331,7 +423,7 @@ analysis_host_allele_counts_meta_last_100_dist_no_introgression_plt = ggplot(ana
     fill = derived_sim_mode,
     facet = run_id_same_config_different_mode
   ) +
-  geom_histogram(binwidth = 10, position = "identity", alpha = 0.2) +
+  geom_histogram(binwidth = 2, position = "identity", alpha = 0.2) +
   theme_minimal() +
   facet_wrap(vars(
     run_id_same_config_different_mode
@@ -346,7 +438,7 @@ analysis_host_allele_counts_meta_last_100_dist_introgression_plt = ggplot(analys
     fill = derived_sim_mode,
     facet = run_id_same_config_different_mode
   ) +
-  geom_histogram(binwidth = 10, position = "identity", alpha = 0.2) +
+  geom_histogram(binwidth = 2, position = "identity", alpha = 0.2) +
   theme_minimal() +
   facet_wrap(vars(
     run_id_same_config_different_mode

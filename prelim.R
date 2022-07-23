@@ -1,4 +1,4 @@
-rm(list = ls())
+#rm(list = ls())
 
 library(tools)
 library(rjson)
@@ -15,7 +15,7 @@ library(esquisse)
 source("./help.R")
 
 data_dir <- "./data"
-current_run_id <- "2022-07-14-25"
+current_run_id <- "2022-07-17-22"
 current_run_path <- file.path(data_dir, current_run_id)
 
 output_dir <- "./output"
@@ -277,7 +277,7 @@ run_pathogen_data_fitness_mean_no_burnin_infecting_plt_autoscale <- ggplot(run_p
     group = interaction(config_id, species),
     color = config_id
   ) +
-  geom_hline(yintercept = as.numeric(run_config_common[1,"pathogens.fitness_minimum"])) +
+  #geom_hline(yintercept = as.numeric(run_config_common[1,"pathogens.fitness_minimum"])) +
   geom_point() +
   geom_line() +
   theme_minimal()
@@ -608,13 +608,13 @@ run_allele_counts_last_100_plt
 save_plot_defaults(file.path(output_dir, current_run_id, "allele_counts_last_500.png"), run_allele_counts_last_100_plt, 20000, 5000)
 
 
-# allele age
+# allele mean age
 run_host_allele_data_age_summary = run_host_allele_data_combined_meta %>% 
   group_by(config_id, generation, species, locus_id) %>%
   summarise(age_mean = mean(age), .groups = "keep")
 
 
-run_host_allele_data_age_plt = ggplot(run_host_allele_data_age_summary) +
+run_host_allele_data_age_mean_plt = ggplot(run_host_allele_data_age_summary) +
   aes(
     x = generation,
     y = age_mean,
@@ -627,8 +627,34 @@ run_host_allele_data_age_plt = ggplot(run_host_allele_data_age_summary) +
     vars(config_id)
   )
   
-run_host_allele_data_age_plt
-save_plot_defaults(file.path(output_dir, current_run_id, "allele_age_mean.png"), run_host_allele_data_age_plt, 5000, 3000)
+run_host_allele_data_age_mean_plt
+save_plot_defaults(file.path(output_dir, current_run_id, "allele_age_mean.png"), run_host_allele_data_age_mean_plt, 5000, 3000)
+
+
+# allele age over frequency
+
+run_host_allele_data_age_freq_summary = run_host_allele_data_combined_meta %>%
+  filter(bBurninMode == FALSE & age < 100) %>%
+  group_by(config_id, species, locus_id, age) %>%
+  summarise(frequency_mean = mean(frequency), .groups = "keep")
+
+run_host_allele_data_age_freq_plt = ggplot(run_host_allele_data_age_freq_summary) +
+  aes(
+    x = age,
+    y = frequency_mean,
+    color = config_id,
+    facet = config_id
+  ) + 
+  geom_line() +
+  theme_minimal() + 
+  facet_wrap(
+    vars(config_id)
+  )
+
+run_host_allele_data_age_freq_plt
+
+save_plot_defaults(file.path(output_dir, current_run_id, "allele_age_freq_mean.png"), run_host_allele_data_age_freq_plt, 5000, 3000)
+
 
 # allele frequencies over time
 # run_allele_freqs_plt = ggplot(run_host_allele_data_combined) +
@@ -671,6 +697,29 @@ run_allele_freqs_last_n_plt = ggplot(run_host_allele_data_combined_last_n) +
 
 run_allele_freqs_last_n_plt
 save_plot_defaults(file.path(output_dir, current_run_id, "allele_freqs_last_400.png"), run_allele_freqs_last_n_plt, 5000, 3000)
+
+
+# only first n generations (burnin/neutrality)
+run_host_allele_data_combined_first_n = run_host_allele_data_combined %>%
+  filter(generation < 400)
+
+run_allele_freqs_first_n_plt = ggplot(run_host_allele_data_combined_first_n) +
+  aes(
+    x = generation,
+    y = frequency,
+    color = created_at,
+    group = allele_id,
+    facet = config_id
+  ) +
+  geom_line(size = 0.2) +
+  #theme_minimal() +
+  scale_color_viridis_c(option = "turbo") +
+  facet_wrap(
+    vars(config_id)
+  )
+
+run_allele_freqs_first_n_plt
+save_plot_defaults(file.path(output_dir, current_run_id, "allele_freqs_first_400.png"), run_allele_freqs_first_n_plt, 5000, 3000)
 
 
 # run_allele_frequencies_plt = ggplot(run_host_allele_data_combined) +
