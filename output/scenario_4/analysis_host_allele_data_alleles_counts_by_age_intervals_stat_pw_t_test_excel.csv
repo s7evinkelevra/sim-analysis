@@ -1,0 +1,2 @@
+"hosts.mutation_rate_per_peptide";"pathogens.introgression_individuals_per_generation";"pathogens.mutation_rate_per_peptide";"pathogens.species_n";".y.";"group1";"group2";"n1";"n2";"p";"p.signif";"p.adj";"p.adj.signif";"y.position";"groups";"xmin";"xmax"
+"1e-05";"0";"0.001";"1";"alleles_retained_percent";"Coevolution";"Neutrality";6;12;9,34e-12;"****";4,4832e-10;"****";0,40664;

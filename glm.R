@@ -41,7 +41,10 @@ analysis_allele_counts_no_merit_change_no_coevolution = analysis_allele_counts_n
 
 summary(analysis_allele_counts_no_merit_change_neutrality)
 
-neutrality_lm <- lm(allele_count_mean ~ (pathogens.introgression_individuals_per_generation + pathogens.species_n + hosts.species_n)^2,
+# formula scenario 2: allele_count_mean ~ (pathogens.introgression_individuals_per_generation + pathogens.species_n + hosts.species_n)^2
+# formula scenario 3+4: allele_count_mean ~ (pathogens.introgression_individuals_per_generation + pathogens.species_n + pathogens.mutation_rate_per_peptide + hosts.mutation_rate_per_peptide)^2
+by_mode_formula = allele_count_mean ~ (pathogens.introgression_individuals_per_generation + pathogens.species_n + pathogens.mutation_rate_per_peptide + hosts.mutation_rate_per_peptide)^2
+neutrality_lm <- lm(by_mode_formula,
                     data = analysis_allele_counts_no_merit_change_neutrality)
 
 anova(neutrality_lm)
@@ -51,7 +54,7 @@ plot(neutrality_lm)
 par(mfrow=c(1,1))
 
 
-coevolution_lm <- lm(allele_count_mean ~ (pathogens.introgression_individuals_per_generation + pathogens.species_n + hosts.species_n)^2,
+coevolution_lm <- lm(by_mode_formula,
                     data = analysis_allele_counts_no_merit_change_coevolution)
 
 anova(coevolution_lm)
@@ -62,8 +65,11 @@ par(mfrow=c(1,1))
 
 
 
-no_coevolution_lm <- lm(allele_count_mean ~ (pathogens.introgression_individuals_per_generation + pathogens.species_n + hosts.species_n)^2,
+no_coevolution_lm <- aov(by_mode_formula,
                     data = analysis_allele_counts_no_merit_change_no_coevolution)
+
+TukeyHSD(no_coevolution_lm)
+
 
 anova(no_coevolution_lm)
 
@@ -73,10 +79,10 @@ par(mfrow=c(1,1))
 
 
 
-neutrality_aov = aov(allele_count_mean ~ pathogens.introgression_individuals_per_generation + pathogens.species_n + hosts.mutation_rate_per_peptide + infection.merit_threshold,
-                     data = neutrality_only)
+no_coevolution_aov = aov(by_mode_formula,
+                     data = analysis_allele_counts_no_merit_change_no_coevolution)
 
-anova(neutrality_aov)
+anova(no_coevolution_aov)
 
 no_thresh = analysis_host_allele_counts_meta_last_100_by_config_id_summary %>%
   filter(derived_sim_mode == "Coevolution" & infection.merit_threshold == 4)

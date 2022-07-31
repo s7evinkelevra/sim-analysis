@@ -1,4 +1,5 @@
 # nice name lol
+# prelim.R related helper
 read_config_config <- function(config_path) {
   return(rjson::fromJSON(file=file.path(config_path, "config.json")))
 }
@@ -121,4 +122,100 @@ add_data <- function(base, adding){
 
 save_plot_defaults <- function(path, plt, width, height){
   ggsave(path, plot = plt, width = width, height = height, dpi = "retina", device = "png", type="cairo", units = "px", bg = "#ffffff", limitsize = FALSE)
+}
+
+
+
+# thes.R related helper
+build_run_ids_same_date <- function(date_base, from, to){
+  run_ids = c()
+  for(id in from:to){
+    run_ids = append(run_ids, paste0(date_base,"-",id))
+  }
+  
+  return(run_ids)
+}
+
+read_analysis_configs <- function(run_ids) {
+  analysis_configs = list()
+  for(id in run_ids) {
+    run_path = file.path(data_dir, id)
+    configs = read_run_configs(run_path)
+    run_configs_tibble = generate_run_config_summary(id, configs) %>% rownames_to_column(var = "config_id")
+    analysis_configs[[id]] = run_configs_tibble[1,]
+  }
+  
+  analysis_configs_tbl = bind_rows(analysis_configs, .id = "run_id") %>% replace_na(list("hosts.introgression_individuals_per_generation" = "0", "pathogens.introgression_individuals_per_generation" = "0" ))
+  
+  return(analysis_configs_tbl)
+}
+
+read_analysis_data <- function(run_ids, csv_name, min_generation = 0, max_generation = 1000000) {
+  analysis_data = list()
+  for(id in run_ids){
+    gc()
+    print(id)
+    run_path = file.path(data_dir, id)
+    data = read_run_data(run_path, csv_name)
+    data_combined = bind_rows(data, .id = "config_id") %>% filter(generation >= min_generation & generation <= max_generation)
+    analysis_data[[id]] = data_combined
+  }
+  analysis_data_combined = bind_rows(analysis_data, .id = "run_id")
+  return(analysis_data_combined)
+}
+
+add_meta_data_analysis <- function(left, meta_data) {
+  return(
+    left_join(left, meta_data, by = c("run_id", "config_id", "generation"))
+  )
+}
+
+add_meta_sim_mode_analysis <- function(left, meta_data) {
+  meta_data_sim_mode = meta_data %>% select(run_id, config_id, generation, derived_sim_mode)
+  return(
+    left_join(left, meta_data_sim_mode, by = c("run_id", "config_id", "generation"))
+  )
+}
+
+
+add_run_config_analysis <- function(left, analysis_configs) {
+  return(
+    left_join(left, analysis_configs, by = c("run_id"))
+  )
+}
+
+add_run_config_run_id_same_config_different_mode_analysis <- function(left, analysis_configs) {
+  analysis_configs_reduced = analysis_configs %>% select(run_id, run_id_same_config_different_mode)
+  return(
+    left_join(left, analysis_configs_reduced, by = c("run_id"))
+  )
+}
+
+
+add_merged_run_config_analysis <- function(left, analysis_configs) {
+  return(
+    left_join(left, analysis_configs, by = c("run_id_same_config_different_mode"))
+  )
+}
+
+merge_by_paste_if_unequal <- function(x) {
+  if(length(unique(x)) > 1){
+    paste(x, collapse = ".")
+  }else{
+    x[1]  
+  }
+}
+
+label_from_id <- function(id) {
+  row_id_analysis_configs = analysis_configs_merged_unique_changed %>%
+    column_to_rownames("id_same_config_different_mode") %>%
+    select((!run_id_same_config_different_mode & !hash_no_sim_mode))
+  
+  label = ""
+  
+  for(col_i in 1:ncol(row_id_analysis_configs[id,])) {
+    label = paste(label, colnames(row_id_analysis_configs[id,])[col_i], "=", row_id_analysis_configs[id, col_i], "\n")
+  }
+  
+  return(label)
 }

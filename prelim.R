@@ -15,7 +15,7 @@ library(esquisse)
 source("./help.R")
 
 data_dir <- "./data"
-current_run_id <- "2022-07-17-22"
+current_run_id <- "2022-07-14-33"
 current_run_path <- file.path(data_dir, current_run_id)
 
 output_dir <- "./output"
@@ -631,14 +631,15 @@ run_host_allele_data_age_mean_plt
 save_plot_defaults(file.path(output_dir, current_run_id, "allele_age_mean.png"), run_host_allele_data_age_mean_plt, 5000, 3000)
 
 
-# allele age over frequency
+# allele age over frequency mean
 
 run_host_allele_data_age_freq_summary = run_host_allele_data_combined_meta %>%
   filter(bBurninMode == FALSE & age < 100) %>%
+  #filter(bBurninMode == TRUE & age < 100) %>%
   group_by(config_id, species, locus_id, age) %>%
-  summarise(frequency_mean = mean(frequency), .groups = "keep")
+  summarise(frequency_mean = mean(frequency), count = n(), .groups = "keep")
 
-run_host_allele_data_age_freq_plt = ggplot(run_host_allele_data_age_freq_summary) +
+run_host_allele_data_age_freq_mean_plt = ggplot(run_host_allele_data_age_freq_summary) +
   aes(
     x = age,
     y = frequency_mean,
@@ -651,9 +652,98 @@ run_host_allele_data_age_freq_plt = ggplot(run_host_allele_data_age_freq_summary
     vars(config_id)
   )
 
-run_host_allele_data_age_freq_plt
+run_host_allele_data_age_count_plt = ggplot(run_host_allele_data_age_freq_summary) +
+  aes(
+    x = age,
+    y = count,
+    color = config_id,
+    facet = config_id
+  ) + 
+  geom_line() +
+  theme_minimal() + 
+  facet_wrap(
+    vars(config_id)
+  )
 
-save_plot_defaults(file.path(output_dir, current_run_id, "allele_age_freq_mean.png"), run_host_allele_data_age_freq_plt, 5000, 3000)
+run_host_allele_data_age_freq_mean_plt
+run_host_allele_data_age_count_plt
+
+save_plot_defaults(file.path(output_dir, current_run_id, "allele_age_freq_mean.png"), run_host_allele_data_age_freq_mean_plt, 5000, 3000)
+save_plot_defaults(file.path(output_dir, current_run_id, "allele_age_count.png"), run_host_allele_data_age_count_plt, 5000, 3000)
+
+# allele age frequency by allele id
+
+run_host_allele_ids = run_host_allele_data_combined_meta %>%
+  group_by(config_id) %>%
+  filter(bBurninMode == FALSE & age == 0) %>%
+  slice_sample(n = 10) %>%
+  pull(allele_id)
+  
+  
+run_host_allele_data_age_freq = run_host_allele_data_combined_meta %>%
+  # with subsampling for many alleles
+  # filter(allele_id %in% run_host_allele_ids & bBurninMode == FALSE & age < 100)
+  # without subsampling
+  filter(bBurninMode == FALSE & age < 100)
+  #filter(bBurninMode == TRUE & age < 500)
+
+run_host_allele_data_age_freq_plt = ggplot(run_host_allele_data_age_freq) +
+  aes(
+    x = age,
+    y = frequency,
+    group = allele_id,
+    color = allele_id,
+    facet = config_id
+  ) + 
+  geom_line() +
+  theme_minimal() + 
+  facet_wrap(
+    vars(config_id)
+  )
+
+run_host_allele_data_age_freq_plt
+save_plot_defaults(file.path(output_dir, current_run_id, "allele_age_freq_by_allele.png"), run_host_allele_data_age_freq_plt, 5000, 3000)
+
+# allele max age by allele id
+run_host_allele_data_age_max = run_host_allele_data_combined_meta %>%
+  group_by(config_id,bBurninMode, allele_id) %>%
+  filter(bBurninMode == FALSE) %>%
+  filter(age == max(age))
+
+run_host_allele_data_age_max_summary = run_host_allele_data_age_max %>%
+  group_by(config_id) %>%
+  summarise(age_mean = mean(age), .groups = "keep")
+
+
+run_host_allele_data_age_max_plt = ggplot(run_host_allele_data_age_max) +
+  aes(
+    x = age,
+    facet = config_id
+  ) + 
+  geom_histogram() + 
+  theme_minimal() +
+  facet_wrap(
+    ~config_id
+  )
+
+run_host_allele_data_age_max_plt
+save_plot_defaults(file.path(output_dir, current_run_id, "allele_max_age_dist.png"), run_host_allele_data_age_max_plt, 5000, 3000)
+
+
+# recruitment success after 10 generations
+run_host_allele_data_age_max_total = run_host_allele_data_age_max %>%
+  group_by(config_id) %>%
+  count(name = "total")
+
+
+run_host_allele_data_age_max_rec = run_host_allele_data_age_max %>%
+  group_by(config_id) %>%
+  filter(age >= 10) %>%
+  count(name = "recruited") %>%
+  left_join(run_host_allele_data_age_max_total, by = c("config_id")) %>%
+  mutate(recruitment_rate = recruited/total)
+
+  
 
 
 # allele frequencies over time
