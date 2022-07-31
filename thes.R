@@ -626,10 +626,10 @@ analysis_host_allele_data_created_last_n = analysis_host_allele_data %>%
   # filters alleles created in the last 100 generations 
   # problem: in a window only 100 generations wide, there is only one possible generation in which an allele could have emerged, that reaces 100 generations of age
   # so: very old alleles (those that are most likely to not be in the 100 generation window) are not captured
-  filter(created_at >= max(generation) - 100) %>%
+  # filter(created_at >= max(generation) - 100) %>%
   # Filter all alleles that are currently at or below 100 generations old.
   # Foregoes issue described above, but also includes alleles from non-equilibrium generations
-  # filter(age <= 1000) %>%
+  filter(age <= 100) %>%
   add_run_config_run_id_same_config_different_mode_analysis(analysis_configs_merged)
   
   
@@ -664,9 +664,9 @@ analysis_host_allele_data_alleles_retained_between_n_m = analysis_host_allele_da
 # test recruitment proportion for differences
 analysis_host_allele_data_alleles_retained_between_0_n_shapiro_test = analysis_host_allele_data_alleles_retained_between_0_n %>%
   # scenario 2 pathogens.introgression_individuals_per_generation + hosts.species_n  ~ pathogens.species_n,
-  group_by(pathogens.introgression_individuals_per_generation, hosts.species_n, pathogens.species_n) %>%
+  # group_by(pathogens.introgression_individuals_per_generation, hosts.species_n, pathogens.species_n, derived_sim_mode) %>%
   # other scenarios
-  # group_by(pathogens.introgression_individuals_per_generation, hosts.mutation_rate_per_peptide, pathogens.species_n, pathogens.mutation_rate_per_peptide) %>%
+  group_by(pathogens.introgression_individuals_per_generation, hosts.mutation_rate_per_peptide, pathogens.species_n, pathogens.mutation_rate_per_peptide, derived_sim_mode) %>%
   shapiro_test(alleles_retained_percent) %>%
   add_significance()
 
