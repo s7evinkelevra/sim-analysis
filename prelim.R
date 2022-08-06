@@ -15,7 +15,7 @@ library(esquisse)
 source("./help.R")
 
 data_dir <- "./data"
-current_run_id <- "2022-07-14-33"
+current_run_id <- "2022-07-15-2"
 current_run_path <- file.path(data_dir, current_run_id)
 
 output_dir <- "./output"

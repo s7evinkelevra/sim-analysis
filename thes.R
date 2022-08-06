@@ -672,10 +672,10 @@ analysis_host_allele_data_alleles_retained_between_0_n_shapiro_test = analysis_h
 
 analysis_host_allele_data_alleles_retained_between_0_n_pw_test = analysis_host_allele_data_alleles_retained_between_0_n %>%
   # scenario 2 pathogens.introgression_individuals_per_generation + hosts.species_n  ~ pathogens.species_n,
-  group_by(pathogens.introgression_individuals_per_generation, hosts.species_n, pathogens.species_n) %>%
+  # group_by(pathogens.introgression_individuals_per_generation, hosts.species_n, pathogens.species_n) %>%
   # other scenarios
-  # group_by(pathogens.introgression_individuals_per_generation, hosts.mutation_rate_per_peptide, pathogens.species_n, pathogens.mutation_rate_per_peptide) %>%
-  wilcox_test(alleles_retained_percent ~ derived_sim_mode) %>%
+  group_by(pathogens.introgression_individuals_per_generation, hosts.mutation_rate_per_peptide, pathogens.species_n, pathogens.mutation_rate_per_peptide) %>%
+  pairwise_t_test(alleles_retained_percent ~ derived_sim_mode) %>%
   adjust_pvalue(method = "bonferroni") %>%
   add_significance() %>%
   add_xy_position(x = "derived_sim_mode")
@@ -684,34 +684,37 @@ analysis_host_allele_data_alleles_retained_between_0_n_pw_test = analysis_host_a
 # test overall retention proportion
 analysis_host_allele_data_alleles_retained_between_0_end_shapiro_test = analysis_host_allele_data_alleles_retained_between_0_end %>%
   # scenario 2 pathogens.introgression_individuals_per_generation + hosts.species_n  ~ pathogens.species_n,
-  group_by(pathogens.introgression_individuals_per_generation, hosts.species_n, pathogens.species_n) %>%
+  # group_by(pathogens.introgression_individuals_per_generation, hosts.species_n, pathogens.species_n, derived_sim_mode) %>%
   # other scenarios
-  # group_by(pathogens.introgression_individuals_per_generation, hosts.mutation_rate_per_peptide, pathogens.species_n, pathogens.mutation_rate_per_peptide) %>%
+  group_by(pathogens.introgression_individuals_per_generation, hosts.mutation_rate_per_peptide, pathogens.species_n, pathogens.mutation_rate_per_peptide, derived_sim_mode) %>%
   shapiro_test(alleles_retained_percent) %>%
   add_significance()
 
 analysis_host_allele_data_alleles_retained_between_0_end_pw_test = analysis_host_allele_data_alleles_retained_between_0_end %>%
   # scenario 2 pathogens.introgression_individuals_per_generation + hosts.species_n  ~ pathogens.species_n,
-  group_by(pathogens.introgression_individuals_per_generation, hosts.species_n, pathogens.species_n) %>%
+  # group_by(pathogens.introgression_individuals_per_generation, hosts.species_n, pathogens.species_n) %>%
   # other scenarios
-  # group_by(pathogens.introgression_individuals_per_generation, hosts.mutation_rate_per_peptide, pathogens.species_n, pathogens.mutation_rate_per_peptide) %>%
-  wilcox_test(alleles_retained_percent ~ derived_sim_mode) %>%
+  group_by(pathogens.introgression_individuals_per_generation, hosts.mutation_rate_per_peptide, pathogens.species_n, pathogens.mutation_rate_per_peptide) %>%
+  pairwise_t_test(alleles_retained_percent ~ derived_sim_mode) %>%
   adjust_pvalue(method = "bonferroni") %>%
   add_significance() %>%
   add_xy_position(x = "derived_sim_mode")
 
 # test retainment proportion for differences
 analysis_host_allele_data_alleles_retained_between_n_m_shapiro_test = analysis_host_allele_data_alleles_retained_between_n_m %>%
-  group_by(pathogens.introgression_individuals_per_generation, hosts.mutation_rate_per_peptide, pathogens.species_n, pathogens.mutation_rate_per_peptide) %>%
-  shapiro_test(alleles_retained_percent) %>%
+  # scenario 2 pathogens.introgression_individuals_per_generation + hosts.species_n  ~ pathogens.species_n,
+  # group_by(pathogens.introgression_individuals_per_generation, hosts.species_n, pathogens.species_n, derived_sim_mode) %>%
+  # other scenarios
+  group_by(pathogens.introgression_individuals_per_generation, hosts.mutation_rate_per_peptide, pathogens.species_n, pathogens.mutation_rate_per_peptide, derived_sim_mode) %>%
+  shapiro_test(allele_retained_n_m) %>%
   add_significance()
 
 analysis_host_allele_data_alleles_retained_between_n_m_pw_test = analysis_host_allele_data_alleles_retained_between_n_m %>%
   # scenario 2 pathogens.introgression_individuals_per_generation + hosts.species_n  ~ pathogens.species_n,
-  group_by(pathogens.introgression_individuals_per_generation, hosts.species_n, pathogens.species_n) %>%
+  # group_by(pathogens.introgression_individuals_per_generation, hosts.species_n, pathogens.species_n) %>%
   # other scenarios
-  # group_by(pathogens.introgression_individuals_per_generation, hosts.mutation_rate_per_peptide, pathogens.species_n, pathogens.mutation_rate_per_peptide) %>%
-  wilcox_test(alleles_retained_percent ~ derived_sim_mode) %>%
+  group_by(pathogens.introgression_individuals_per_generation, hosts.mutation_rate_per_peptide, pathogens.species_n, pathogens.mutation_rate_per_peptide) %>%
+  pairwise_t_test(allele_retained_n_m ~ derived_sim_mode) %>%
   adjust_pvalue(method = "bonferroni") %>%
   add_significance() %>%
   add_xy_position(x = "derived_sim_mode")
@@ -727,13 +730,14 @@ analysis_host_allele_data_alleles_retained_between_0_n_plt_box = ggplot(analysis
   ) +
   geom_boxplot() +
   stat_pvalue_manual(analysis_host_allele_data_alleles_retained_between_0_n_pw_test) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
   facet_grid(
     # scenario 2 
-    pathogens.introgression_individuals_per_generation + hosts.species_n  ~ pathogens.species_n,
+    # pathogens.introgression_individuals_per_generation + hosts.species_n  ~ pathogens.species_n,
     # scenario 2 with threshold 
     # pathogens.introgression_individuals_per_generation + hosts.species_n  ~ pathogens.species_n + infection.merit_threshold,
-    #other scenarios: 
-    # pathogens.introgression_individuals_per_generation + hosts.mutation_rate_per_peptide  ~ pathogens.species_n + pathogens.mutation_rate_per_peptide,
+    # other scenarios: 
+    pathogens.introgression_individuals_per_generation + hosts.mutation_rate_per_peptide  ~ pathogens.species_n + pathogens.mutation_rate_per_peptide,
     #labeller = labeller(id_same_config_different_mode = label_from_id ),
     #scales = "free_x",
     labeller = label_both
@@ -749,13 +753,37 @@ analysis_host_allele_data_alleles_retained_between_0_end_plt_box = ggplot(analys
   ) +
   geom_boxplot() +
   stat_pvalue_manual(analysis_host_allele_data_alleles_retained_between_0_end_pw_test) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
   facet_grid(
     # scenario 2 
-    pathogens.introgression_individuals_per_generation + hosts.species_n  ~ pathogens.species_n,
+    # pathogens.introgression_individuals_per_generation + hosts.species_n  ~ pathogens.species_n,
     # scenario 2 with threshold 
     # pathogens.introgression_individuals_per_generation + hosts.species_n  ~ pathogens.species_n + infection.merit_threshold,
     #other scenarios: 
-    #pathogens.introgression_individuals_per_generation + hosts.mutation_rate_per_peptide  ~ pathogens.species_n + pathogens.mutation_rate_per_peptide,
+    pathogens.introgression_individuals_per_generation + hosts.mutation_rate_per_peptide  ~ pathogens.species_n + pathogens.mutation_rate_per_peptide,
+    #labeller = labeller(id_same_config_different_mode = label_from_id ),
+    #scales = "free_x",
+    labeller = label_both
+  )
+
+# alleles retained between n and m generations
+analysis_host_allele_data_alleles_retained_between_n_m_plt_box = ggplot(analysis_host_allele_data_alleles_retained_between_n_m) +
+  aes(
+    x = derived_sim_mode,
+    y = allele_retained_n_m,
+    group = derived_sim_mode,
+    color = derived_sim_mode,
+  ) +
+  geom_boxplot() +
+  stat_pvalue_manual(analysis_host_allele_data_alleles_retained_between_n_m_pw_test) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
+  facet_grid(
+    # scenario 2 
+    # pathogens.introgression_individuals_per_generation + hosts.species_n  ~ pathogens.species_n,
+    # scenario 2 with threshold 
+    # pathogens.introgression_individuals_per_generation + hosts.species_n  ~ pathogens.species_n + infection.merit_threshold,
+    #other scenarios: 
+    pathogens.introgression_individuals_per_generation + hosts.mutation_rate_per_peptide  ~ pathogens.species_n + pathogens.mutation_rate_per_peptide,
     #labeller = labeller(id_same_config_different_mode = label_from_id ),
     #scales = "free_x",
     labeller = label_both
@@ -764,9 +792,11 @@ analysis_host_allele_data_alleles_retained_between_0_end_plt_box = ggplot(analys
 
 analysis_host_allele_data_alleles_retained_between_0_n_plt_box
 analysis_host_allele_data_alleles_retained_between_0_end_plt_box
+analysis_host_allele_data_alleles_retained_between_n_m_plt_box
 
 save_plot_defaults(file.path(output_path, "analysis_host_allele_data_alleles_retained_between_0_n_plt_box.png"),analysis_host_allele_data_alleles_retained_between_0_n_plt_box, 5000, 5000 )
 save_plot_defaults(file.path(output_path, "analysis_host_allele_data_alleles_retained_between_0_end_plt_box.png"),analysis_host_allele_data_alleles_retained_between_0_end_plt_box, 5000, 5000 )
+save_plot_defaults(file.path(output_path, "analysis_host_allele_data_alleles_retained_between_n_m_plt_box.png"),analysis_host_allele_data_alleles_retained_between_n_m_plt_box, 5000, 5000 )
 
 
 analysis_host_allele_data_alleles_retained_per_config_all_generations_plt_grid = ggplot(analysis_host_allele_data_alleles_counts_by_age) +
@@ -865,7 +895,7 @@ analysis_host_genome_meta_combined = analysis_host_data_meta_last_n %>%
   select(-ends_with(".y"))
   
 
-
+# zygosity vs fitness
 analysis_host_genome_meta_combined_zygosity_summary = analysis_host_genome_meta_combined %>%
   group_by(run_id, config_id, derived_sim_mode, species, locus_id, zygosity) %>%
   summarise(fitness_mean = mean(fitness), fitness_sd = sd(fitness), fitness_cv = cv(fitness), count = n(), .groups = "keep") %>%
@@ -876,10 +906,9 @@ analysis_host_genome_meta_combined_zygosity_summary = analysis_host_genome_meta_
 
 
 
-
 ## statistical tests 
 # shapiro test for normality
-analysis_host_genome_meta_combined_zygosity_summary_shapiro_test = analysis_host_genome_meta_combined_zygosity_summary %>%
+analysis_host_genome_meta_combined_zygosity_summary_fitness_shapiro_test = analysis_host_genome_meta_combined_zygosity_summary %>%
   # scenario 2 pathogens.introgression_individuals_per_generation + hosts.species_n  ~ pathogens.species_n,
   # group_by(pathogens.introgression_individuals_per_generation, hosts.species_n, pathogens.species_n, derived_sim_mode, zygosity) %>%
   # other scenarios
@@ -888,32 +917,32 @@ analysis_host_genome_meta_combined_zygosity_summary_shapiro_test = analysis_host
   add_significance()
 
 # paired t test probs would also work, almost all groups normally distributed
-analysis_host_genome_meta_combined_zygosity_summary_sim_mode_pw_test = analysis_host_genome_meta_combined_zygosity_summary %>%
+analysis_host_genome_meta_combined_zygosity_summary_fitness_sim_mode_pw_test = analysis_host_genome_meta_combined_zygosity_summary %>%
   # scenario 2 
-  # group_by(pathogens.introgression_individuals_per_generation, hosts.species_n, pathogens.species_n, zygosity) %>%
+  group_by(pathogens.introgression_individuals_per_generation, hosts.species_n, pathogens.species_n, zygosity) %>%
   # other scenarios
-  group_by(pathogens.introgression_individuals_per_generation, hosts.mutation_rate_per_peptide, pathogens.species_n, pathogens.mutation_rate_per_peptide, zygosity) %>%
+  # group_by(pathogens.introgression_individuals_per_generation, hosts.mutation_rate_per_peptide, pathogens.species_n, pathogens.mutation_rate_per_peptide, zygosity) %>%
   pairwise_wilcox_test(fitness_mean ~ derived_sim_mode, exact = TRUE, p.adjust.method = "holm") %>%
   #adjust_pvalue(method = "bonferroni") %>%
   add_significance() %>%
   add_xy_position(x = "derived_sim_mode")
 
 
-analysis_host_genome_meta_combined_zygosity_summary_zygosity_pw_test = analysis_host_genome_meta_combined_zygosity_summary %>%
+analysis_host_genome_meta_combined_zygosity_summary_fitness_zygosity_pw_test = analysis_host_genome_meta_combined_zygosity_summary %>%
   # scenario 2 
-  # group_by(pathogens.introgression_individuals_per_generation, hosts.species_n, pathogens.species_n, derived_sim_mode) %>%
+  group_by(pathogens.introgression_individuals_per_generation, hosts.species_n, pathogens.species_n, derived_sim_mode) %>%
   # other scenarios
-  group_by(pathogens.introgression_individuals_per_generation, hosts.mutation_rate_per_peptide, pathogens.species_n, pathogens.mutation_rate_per_peptide, derived_sim_mode) %>%
+  # group_by(pathogens.introgression_individuals_per_generation, hosts.mutation_rate_per_peptide, pathogens.species_n, pathogens.mutation_rate_per_peptide, derived_sim_mode) %>%
   pairwise_wilcox_test(fitness_mean ~ zygosity, exact = TRUE, p.adjust.method = "holm") %>%
   #adjust_pvalue(method = "bonferroni") %>%
   add_significance() %>%
   add_xy_position(x = "zygosity")
 
-analysis_host_genome_meta_combined_zygosity_summary_anova = analysis_host_genome_meta_combined_zygosity_summary %>%
+analysis_host_genome_meta_combined_zygosity_summary_fitness_anova = analysis_host_genome_meta_combined_zygosity_summary %>%
   # scenario 2 
-  # group_by(pathogens.introgression_individuals_per_generation, hosts.species_n, pathogens.species_n, derived_sim_mode) %>%
+  group_by(pathogens.introgression_individuals_per_generation, hosts.species_n, pathogens.species_n, derived_sim_mode) %>%
   # other scenarios
-  group_by(derived_sim_mode) %>%
+  # group_by(derived_sim_mode) %>%
   anova_test(fitness_mean ~ zygosity)
 
 #### wilcox experiments
@@ -936,14 +965,14 @@ analysis_host_genome_meta_combined_zygosity_fitness_sim_mode_plt_box = ggplot(an
     color = derived_sim_mode
   ) + 
   geom_boxplot() +
-  stat_pvalue_manual(analysis_host_genome_meta_combined_zygosity_summary_sim_mode_pw_test) +
+  stat_pvalue_manual(analysis_host_genome_meta_combined_zygosity_summary_fitness_sim_mode_pw_test) +
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
   theme(axis.text.x = element_text(angle = -45, hjust = 0, vjust = 0.5)) +
   facet_grid(
     # scenario 2 first n last n
-    # pathogens.introgression_individuals_per_generation + hosts.species_n ~ pathogens.species_n + zygosity,
+    pathogens.introgression_individuals_per_generation + hosts.species_n ~ pathogens.species_n + zygosity,
     # other scenarios first n last n: 
-    pathogens.introgression_individuals_per_generation + hosts.mutation_rate_per_peptide ~ pathogens.species_n + pathogens.mutation_rate_per_peptide + zygosity,
+    # pathogens.introgression_individuals_per_generation + hosts.mutation_rate_per_peptide ~ pathogens.species_n + pathogens.mutation_rate_per_peptide + zygosity,
     #labeller = labeller(id_same_config_different_mode = label_from_id ),
     scales = "free_x",
     labeller = label_both
@@ -958,14 +987,14 @@ analysis_host_genome_meta_combined_zygosity_fitness_zygosity_plt_box = ggplot(an
     color = zygosity
   ) + 
   geom_boxplot() +
-  stat_pvalue_manual(analysis_host_genome_meta_combined_zygosity_summary_zygosity_pw_test) +
+  stat_pvalue_manual(analysis_host_genome_meta_combined_zygosity_summary_fitness_zygosity_pw_test) +
   scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
   theme(axis.text.x = element_text(angle = -45, hjust = 0, vjust = 0.5)) +
   facet_grid(
     # scenario 2 first n last n
-    # pathogens.introgression_individuals_per_generation + hosts.species_n ~ pathogens.species_n + derived_sim_mode,
+    pathogens.introgression_individuals_per_generation + hosts.species_n ~ pathogens.species_n + derived_sim_mode,
     # other scenarios first n last n: 
-    pathogens.introgression_individuals_per_generation + hosts.mutation_rate_per_peptide ~ pathogens.species_n + pathogens.mutation_rate_per_peptide + derived_sim_mode,
+    # pathogens.introgression_individuals_per_generation + hosts.mutation_rate_per_peptide ~ pathogens.species_n + pathogens.mutation_rate_per_peptide + derived_sim_mode,
     #labeller = labeller(id_same_config_different_mode = label_from_id ),
     scales = "free_x",
     labeller = label_both
@@ -977,6 +1006,67 @@ analysis_host_genome_meta_combined_zygosity_fitness_sim_mode_plt_box
 analysis_host_genome_meta_combined_zygosity_fitness_zygosity_plt_box
 save_plot_defaults(file.path(output_path, "analysis_host_genome_meta_combined_zygosity_fitness_sim_mode_plt_box.png"),analysis_host_genome_meta_combined_zygosity_fitness_sim_mode_plt_box, 5000, 5000 )
 save_plot_defaults(file.path(output_path, "analysis_host_genome_meta_combined_zygosity_fitness_zygosity_plt_box.png"),analysis_host_genome_meta_combined_zygosity_fitness_zygosity_plt_box, 5000, 5000 )
+
+
+
+
+## zygosity general
+analysis_host_genome_meta_combined_zygosity_counts = analysis_host_genome_meta_combined %>%
+  group_by(run_id, config_id, derived_sim_mode, species, locus_id, zygosity) %>%
+  summarise(count = n(), .groups = "keep") %>% 
+  add_run_config_analysis(analysis_configs_merged) %>%
+  filter(infection.merit_threshold == 4) %>%
+  filter(species == 0) %>%
+  pivot_wider(names_from = zygosity, values_from = count) %>%
+  mutate(hobs = Heterozygous/(Homozygous+Heterozygous))
+
+
+## statistical tests 
+# shapiro test for normality
+analysis_host_genome_meta_combined_zygosity_counts_shapiro_test = analysis_host_genome_meta_combined_zygosity_counts %>%
+  # scenario 2 pathogens.introgression_individuals_per_generation + hosts.species_n  ~ pathogens.species_n,
+  group_by(pathogens.introgression_individuals_per_generation, hosts.species_n, pathogens.species_n, derived_sim_mode) %>%
+  # other scenarios
+  #group_by(pathogens.introgression_individuals_per_generation, hosts.mutation_rate_per_peptide, pathogens.species_n, pathogens.mutation_rate_per_peptide, derived_sim_mode, zygosity, infection.merit_threshold) %>%
+  shapiro_test(hobs) %>%
+  add_significance()
+
+# paired t test probs would also work, almost all groups normally distributed
+analysis_host_genome_meta_combined_zygosity_counts_sim_mode_pw_test = analysis_host_genome_meta_combined_zygosity_counts %>%
+  # scenario 2 
+  # group_by(pathogens.introgression_individuals_per_generation, hosts.species_n, pathogens.species_n) %>%
+  # other scenarios
+  group_by(pathogens.introgression_individuals_per_generation, hosts.mutation_rate_per_peptide, pathogens.species_n, pathogens.mutation_rate_per_peptide) %>%
+  pairwise_t_test(hobs ~ derived_sim_mode) %>%
+  adjust_pvalue(method = "bonferroni") %>%
+  add_significance() %>%
+  add_xy_position(x = "derived_sim_mode")
+
+
+analysis_host_genome_meta_combined_zygosity_counts_plt_box = ggplot(analysis_host_genome_meta_combined_zygosity_counts) +
+  aes(
+    x = derived_sim_mode,
+    y = hobs,
+    group = derived_sim_mode,
+    color = derived_sim_mode
+  ) + 
+  geom_boxplot() +
+  stat_pvalue_manual(analysis_host_genome_meta_combined_zygosity_counts_sim_mode_pw_test) +
+  scale_y_continuous(expand = expansion(mult = c(0.05, 0.15))) +
+  theme(axis.text.x = element_text(angle = -45, hjust = 0, vjust = 0.5)) +
+  facet_grid(
+    # scenario 2 first n last n
+    # pathogens.introgression_individuals_per_generation + hosts.species_n ~ pathogens.species_n,
+    # other scenarios first n last n: 
+    pathogens.introgression_individuals_per_generation + hosts.mutation_rate_per_peptide ~ pathogens.species_n + pathogens.mutation_rate_per_peptide,
+    #labeller = labeller(id_same_config_different_mode = label_from_id ),
+    scales = "free_x",
+    labeller = label_both
+  )
+
+analysis_host_genome_meta_combined_zygosity_counts_plt_box
+
+save_plot_defaults(file.path(output_path, "analysis_host_genome_meta_combined_zygosity_counts_plt_box.png"),analysis_host_genome_meta_combined_zygosity_counts_plt_box, 8000, 5000 )
 
 
 gc()
