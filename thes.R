@@ -8,10 +8,14 @@ library(goeveg)
 library(digest)
 
 library(tidyverse)
-library(plotly)
-library(Cairo)
-library(ggpubr)
 library(rstatix)
+
+library(plotly)
+library(ggpubr)
+library(Cairo)
+library(ggthemes)
+library(scales)
+library(grid)
 
 library(esquisse)
 
